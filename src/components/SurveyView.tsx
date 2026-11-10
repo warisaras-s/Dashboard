@@ -11,6 +11,7 @@ import {
 } from 'lucide-react';
 import { SURVEY_QUESTIONS, RATING_SCALE, getInterpretation } from '../data/questions';
 import { SurveyResponse } from '../types';
+import { submitSurveyResponse } from '../services/surveyStore';
 
 interface SurveyViewProps {
   onSubmittedSuccess?: (res: SurveyResponse) => void;
@@ -91,25 +92,15 @@ export const SurveyView: React.FC<SurveyViewProps> = ({
     const deviceId = getDeviceId();
 
     try {
-      const res = await fetch('/api/responses', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          q1: answers.q1,
-          q2: answers.q2,
-          q3: answers.q3,
-          q4: answers.q4,
-          q5: answers.q5,
-          feedback: feedback.trim(),
-          deviceId,
-        }),
+      const saved = await submitSurveyResponse({
+        q1: answers.q1,
+        q2: answers.q2,
+        q3: answers.q3,
+        q4: answers.q4,
+        q5: answers.q5,
+        feedback: feedback.trim(),
+        deviceId,
       });
-
-      const data = await res.json();
-
-      if (!res.ok) {
-        throw new Error(data.error || 'ไม่สามารถส่งแบบประเมินได้ โปรดลองอีกครั้ง');
-      }
 
       // Celebratory soft confetti
       confetti({
@@ -123,17 +114,17 @@ export const SurveyView: React.FC<SurveyViewProps> = ({
       localStorage.setItem('training_survey_submitted_at', now.toString());
       localStorage.setItem(
         'training_survey_submitted_avg',
-        (data.response?.average || currentAverage || 5).toString()
+        (saved.average || currentAverage || 5).toString()
       );
 
       setHasSubmitted(true);
       setSubmittedData({
-        average: data.response?.average || currentAverage || 5,
+        average: saved.average || currentAverage || 5,
         timestamp: now,
       });
 
-      if (onSubmittedSuccess && data.response) {
-        onSubmittedSuccess(data.response);
+      if (onSubmittedSuccess) {
+        onSubmittedSuccess(saved);
       }
     } catch (err: any) {
       setErrorMessage(err.message || 'เกิดข้อผิดพลาดในการเชื่อมต่อเครือข่าย');

@@ -31,6 +31,9 @@ interface DashboardViewProps {
   onSimulateResponse: () => void;
   surveyUrl: string;
   onOpenQrModal: () => void;
+  onOpenFirebaseModal: () => void;
+  isFirebaseConnected: boolean;
+  activeDatabaseUrl?: string;
 }
 
 export const DashboardView: React.FC<DashboardViewProps> = ({
@@ -41,6 +44,9 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
   onSimulateResponse,
   surveyUrl,
   onOpenQrModal,
+  onOpenFirebaseModal,
+  isFirebaseConnected,
+  activeDatabaseUrl,
 }) => {
   const [isFullscreen, setIsFullscreen] = useState(false);
   const [isLightMode, setIsLightMode] = useState(false);
@@ -297,6 +303,29 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
           </div>
         </div>
 
+        {/* Netlify / Firebase Guidance Banner */}
+        {!isFirebaseConnected && (
+          <div className="bg-stone-900/80 border border-stone-800 rounded-2xl p-4 flex flex-wrap items-center justify-between gap-3 text-xs shadow-sm">
+            <div className="flex items-center gap-2.5 text-stone-300">
+              <span className="text-amber-300 text-sm">✦</span>
+              <div>
+                <span className="font-semibold text-stone-100">
+                  กำลังทำงานในโหมดสาธิต (Local):
+                </span>{' '}
+                <span className="text-stone-400">
+                  บน Netlify เพื่อให้ผู้เข้าอบรมสแกนตอบจากมือถือจริงและข้อมูลขึ้นจอนี้ทันที กรุณาเชื่อมต่อ Firebase Realtime Database
+                </span>
+              </div>
+            </div>
+            <button
+              onClick={onOpenFirebaseModal}
+              className="px-3.5 py-1.5 rounded-lg text-xs font-semibold bg-stone-100 hover:bg-white text-stone-950 transition shrink-0 shadow-sm"
+            >
+              ตั้งค่าเชื่อมต่อ Firebase
+            </button>
+          </div>
+        )}
+
         {/* Top KPI Cards & QR Row */}
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-12 gap-5">
           {/* Card 1: Total Respondents (3 cols) */}
@@ -329,10 +358,13 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
             </div>
 
             <div className="mt-4 pt-3 border-t border-stone-800/40 text-xs text-stone-400 flex items-center justify-between">
-              <span>สถานะการเชื่อมต่อ</span>
-              <span className="text-amber-300/90 font-mono text-[11px]">
-                Active Live
-              </span>
+              <span>ระบบฐานข้อมูล</span>
+              <button
+                onClick={onOpenFirebaseModal}
+                className="text-amber-300 font-mono text-[11px] hover:underline flex items-center gap-1"
+              >
+                <span>{isFirebaseConnected ? 'Firebase Cloud' : 'Local / Demo'}</span>
+              </button>
             </div>
           </div>
 

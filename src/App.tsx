@@ -1,11 +1,19 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Navbar } from './components/Navbar';
 import { SurveyView } from './components/SurveyView';
 import { DashboardView } from './components/DashboardView';
 import { QrCodeModal } from './components/QrCodeModal';
 import { StandaloneCodeModal } from './components/StandaloneCodeModal';
+import { FirebaseConfigModal } from './components/FirebaseConfigModal';
 import { AppView, SurveyResponse, DashboardStats } from './types';
 import { getInterpretation } from './data/questions';
+import {
+  subscribeToResponses,
+  submitSurveyResponse,
+  resetResponsesData,
+  clearAllResponsesData,
+  getStoredFirebaseConfig,
+} from './services/surveyStore';
 
 const defaultStats: DashboardStats = {
   totalRespondents: 0,
@@ -21,6 +29,9 @@ export default function App() {
   const [responses, setResponses] = useState<SurveyResponse[]>([]);
   const [isQrModalOpen, setIsQrModalOpen] = useState(false);
   const [isCodeModalOpen, setIsCodeModalOpen] = useState(false);
+  const [isFirebaseModalOpen, setIsFirebaseModalOpen] = useState(false);
+  const [isFirebaseConnected, setIsFirebaseConnected] = useState(false);
+  const [activeDbUrl, setActiveDbUrl] = useState<string | undefined>(undefined);
   const [surveyUrl, setSurveyUrl] = useState<string>('');
 
   // Handle URL query parameter ?view=survey or ?view=dashboard
@@ -39,69 +50,31 @@ export default function App() {
     setSurveyUrl(`${base}?view=survey`);
   }, []);
 
-  // Connect to SSE stream for live real-time updates
+  // Subscribe to real-time survey responses (works on Netlify static or Firebase Cloud)
   useEffect(() => {
-    // Initial fetch
-    fetch('/api/responses')
-      .then((res) => res.json())
-      .then((data) => {
-        if (data.success) {
-          if (data.stats) setStats(data.stats);
-          if (data.responses) setResponses(data.responses);
-        }
-      })
-      .catch((err) => console.error('Fetch responses error:', err));
-
-    // Connect to Server-Sent Events stream
-    const eventSource = new EventSource('/api/stream');
-
-    eventSource.onmessage = (event) => {
-      try {
-        const payload = JSON.parse(event.data);
-        if (payload.stats) setStats(payload.stats);
-        if (payload.responses) setResponses(payload.responses);
-      } catch (err) {
-        console.error('SSE parse error:', err);
-      }
-    };
-
-    eventSource.onerror = () => {
-      // Reconnect handled automatically by EventSource
-    };
+    const unsubscribe = subscribeToResponses((data) => {
+      setStats(data.stats);
+      setResponses(data.responses);
+      setIsFirebaseConnected(data.isFirebaseConnected);
+      setActiveDbUrl(data.databaseUrl);
+    });
 
     return () => {
-      eventSource.close();
+      unsubscribe();
     };
   }, []);
 
   const handleResetData = async () => {
-    try {
-      const res = await fetch('/api/reset', { method: 'POST' });
-      const data = await res.json();
-      if (data.stats) setStats(data.stats);
-      fetch('/api/responses')
-        .then((r) => r.json())
-        .then((d) => d.responses && setResponses(d.responses));
-    } catch (err) {
-      console.error(err);
-    }
+    await resetResponsesData();
   };
 
   const handleClearAll = async () => {
     if (confirm('คุณแน่ใจหรือไม่ว่าต้องการล้างข้อมูลการประเมินทั้งหมด (0 รายการ)?')) {
-      try {
-        const res = await fetch('/api/clear-all', { method: 'POST' });
-        const data = await res.json();
-        if (data.stats) setStats(data.stats);
-        setResponses([]);
-      } catch (err) {
-        console.error(err);
-      }
+      await clearAllResponsesData();
     }
   };
 
   const handleSimulateResponse = async () => {
-    // Generate realistic attendee responses
     const sampleFeedbacks = [
       'ประทับใจความตั้งใจของวิทยากร อธิบายชัดเจนมากครับ',
       'Workshop สนุกมาก ได้ทำ Hands-on จริงและเข้าใจระบบได้รวดเร็ว',
@@ -111,7 +84,6 @@ export default function App() {
       'ระบบการอบรมราบรื่น เสียงและภาพคมชัด ทีมงานดูแลดีมาก',
     ];
 
-    // Skew towards positive scores 4-5
     const randomScore = () => (Math.random() > 0.35 ? 5 : 4);
     const q1 = randomScore();
     const q2 = 5;
@@ -122,23 +94,15 @@ export default function App() {
     const feedback =
       sampleFeedbacks[Math.floor(Math.random() * sampleFeedbacks.length)];
 
-    try {
-      await fetch('/api/responses?allowDuplicate=true', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          q1,
-          q2,
-          q3,
-          q4,
-          q5,
-          feedback,
-          deviceId: 'simulated_' + Math.random().toString(36).substring(2, 7),
-        }),
-      });
-    } catch (err) {
-      console.error(err);
-    }
+    await submitSurveyResponse({
+      q1,
+      q2,
+      q3,
+      q4,
+      q5,
+      feedback,
+      deviceId: 'simulated_' + Math.random().toString(36).substring(2, 7),
+    });
   };
 
   const handleDownloadCSV = () => {
@@ -195,7 +159,6 @@ export default function App() {
       setIsCodeModalOpen(true);
     } else {
       setCurrentView(view);
-      // update URL query parameter without full reload
       const url = new URL(window.location.href);
       url.searchParams.set('view', view);
       window.history.replaceState({}, '', url.toString());
@@ -210,15 +173,15 @@ export default function App() {
         onOpenQrModal={() => setIsQrModalOpen(true)}
         onDownloadCSV={handleDownloadCSV}
         totalRespondents={stats.totalRespondents}
+        onOpenFirebaseModal={() => setIsFirebaseModalOpen(true)}
+        isFirebaseConnected={isFirebaseConnected}
       />
 
       <main className="flex-1">
         {currentView === 'survey' ? (
           <SurveyView
             onGoToDashboard={() => handleSelectView('dashboard')}
-            onSubmittedSuccess={() => {
-              // Real-time broadcast automatically triggers update
-            }}
+            onSubmittedSuccess={() => {}}
           />
         ) : (
           <DashboardView
@@ -229,6 +192,9 @@ export default function App() {
             onSimulateResponse={handleSimulateResponse}
             surveyUrl={surveyUrl}
             onOpenQrModal={() => setIsQrModalOpen(true)}
+            onOpenFirebaseModal={() => setIsFirebaseModalOpen(true)}
+            isFirebaseConnected={isFirebaseConnected}
+            activeDatabaseUrl={activeDbUrl}
           />
         )}
       </main>
@@ -244,6 +210,18 @@ export default function App() {
       <StandaloneCodeModal
         isOpen={isCodeModalOpen}
         onClose={() => setIsCodeModalOpen(false)}
+      />
+
+      {/* Firebase Configuration Modal */}
+      <FirebaseConfigModal
+        isOpen={isFirebaseModalOpen}
+        onClose={() => setIsFirebaseModalOpen(false)}
+        onConfigChanged={() => {
+          // Trigger re-subscription
+          window.dispatchEvent(new Event('storage'));
+        }}
+        isCurrentlyConnected={isFirebaseConnected}
+        activeDatabaseUrl={activeDbUrl}
       />
     </div>
   );

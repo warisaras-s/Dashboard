@@ -4,7 +4,9 @@ import {
   Smartphone,
   QrCode,
   Download,
-  Code2
+  Code2,
+  Flame,
+  Database
 } from 'lucide-react';
 import { AppView } from '../types';
 
@@ -14,6 +16,8 @@ interface NavbarProps {
   onOpenQrModal: () => void;
   onDownloadCSV: () => void;
   totalRespondents: number;
+  onOpenFirebaseModal: () => void;
+  isFirebaseConnected: boolean;
 }
 
 export const Navbar: React.FC<NavbarProps> = ({
@@ -22,6 +26,8 @@ export const Navbar: React.FC<NavbarProps> = ({
   onOpenQrModal,
   onDownloadCSV,
   totalRespondents,
+  onOpenFirebaseModal,
+  isFirebaseConnected,
 }) => {
   return (
     <header className="sticky top-0 z-40 bg-stone-950/90 border-b border-stone-800/80 backdrop-blur-md">
@@ -80,7 +86,7 @@ export const Navbar: React.FC<NavbarProps> = ({
 
           <button
             onClick={() => onSelectView('code-guide')}
-            className={`px-3 py-1.5 rounded-lg text-xs font-medium tracking-wide flex items-center gap-1.5 transition-colors ${
+            className={`px-3.5 py-1.5 rounded-lg text-xs font-medium tracking-wide flex items-center gap-1.5 transition-colors ${
               currentView === 'code-guide'
                 ? 'bg-amber-400/15 text-amber-200 border border-amber-300/40'
                 : 'text-stone-400 hover:text-stone-200'
@@ -92,8 +98,22 @@ export const Navbar: React.FC<NavbarProps> = ({
           </button>
         </div>
 
-        {/* Action Controls */}
+        {/* Action Controls & Firebase Status */}
         <div className="flex items-center gap-2">
+          {/* Firebase Connection Button */}
+          <button
+            onClick={onOpenFirebaseModal}
+            className={`px-3 py-1.5 rounded-lg text-xs font-medium border flex items-center gap-1.5 transition ${
+              isFirebaseConnected
+                ? 'bg-amber-400/10 border-amber-300/30 text-amber-200 hover:bg-amber-400/20'
+                : 'bg-stone-900 border-stone-800 text-stone-400 hover:text-stone-200 hover:bg-stone-800'
+            }`}
+            title="ตั้งค่าเชื่อมต่อ Firebase Realtime Database"
+          >
+            <Flame className={`w-3.5 h-3.5 ${isFirebaseConnected ? 'text-amber-300' : 'text-stone-500'}`} />
+            <span>{isFirebaseConnected ? 'Firebase เชื่อมต่อแล้ว' : 'ตั้งค่า Firebase'}</span>
+          </button>
+
           <button
             onClick={onOpenQrModal}
             className="px-3 py-1.5 rounded-lg text-xs font-medium text-stone-300 hover:text-stone-100 bg-stone-900 hover:bg-stone-800/80 border border-stone-800 transition flex items-center gap-1.5"
