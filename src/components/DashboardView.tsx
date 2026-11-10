@@ -18,7 +18,8 @@ import {
   Sun,
   Moon,
   RotateCcw,
-  Plus
+  Plus,
+  CircleDot
 } from 'lucide-react';
 import { SurveyResponse, DashboardStats } from '../types';
 import { SURVEY_QUESTIONS, getInterpretation } from '../data/questions';
@@ -54,6 +55,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
   const [copiedLink, setCopiedLink] = useState(false);
   const [qrDataUrl, setQrDataUrl] = useState<string>('');
   const [lastNotification, setLastNotification] = useState<string | null>(null);
+  const [chartMode, setChartMode] = useState<'circle' | 'bar'>('circle');
 
   const prevResponseCount = useRef(responses.length);
 
@@ -501,14 +503,25 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
                 : 'bg-stone-900/60 border-stone-800'
             }`}
           >
-            <div className="flex flex-wrap items-center justify-between gap-2 mb-6">
+            {/* SVG Defs for Circular Champagne Gold Arc */}
+            <svg className="absolute w-0 h-0" aria-hidden="true" focusable="false">
+              <defs>
+                <linearGradient id="champagneGoldCirc" x1="0%" y1="0%" x2="100%" y2="100%">
+                  <stop offset="0%" stopColor="#fef3c7" />
+                  <stop offset="50%" stopColor="#fde68a" />
+                  <stop offset="100%" stopColor="#d97706" />
+                </linearGradient>
+              </defs>
+            </svg>
+
+            <div className="flex flex-wrap items-center justify-between gap-3 mb-5">
               <div>
                 <h3
                   className={`text-base sm:text-lg font-serif font-semibold flex items-center gap-2 ${
                     isLightMode ? 'text-stone-900' : 'text-stone-100'
                   }`}
                 >
-                  <Sliders className="w-4 h-4 text-amber-300" />
+                  <CircleDot className="w-4 h-4 text-amber-300" />
                   <span>คะแนนเฉลี่ยรายหัวข้อ (สเกล 1 - 5)</span>
                 </h3>
                 <p
@@ -516,71 +529,182 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
                     isLightMode ? 'text-stone-500' : 'text-stone-400'
                   }`}
                 >
-                  คำนวณแบบถ่วงน้ำหนักตามเวลาจริง พร้อมจำแนกตามเกณฑ์มาตรฐาน
+                  แสดงผลแบบเกจวงกลมเรียลไทม์ (เต็ม 5.00 คะแนน)
                 </p>
               </div>
 
-              <div className="text-xs text-stone-400 font-mono">
-                เต็ม 5.00 คะแนน
+              {/* Mode Toggle: Circular vs Bar */}
+              <div className="flex items-center gap-1 p-1 bg-stone-950/80 rounded-xl border border-stone-800 text-xs">
+                <button
+                  onClick={() => setChartMode('circle')}
+                  className={`px-3 py-1 rounded-lg font-medium transition flex items-center gap-1.5 ${
+                    chartMode === 'circle'
+                      ? 'bg-stone-800 text-amber-200 border border-stone-700/80 shadow-sm'
+                      : 'text-stone-400 hover:text-stone-200'
+                  }`}
+                >
+                  <CircleDot className="w-3.5 h-3.5 text-amber-300" />
+                  <span>วงกลม</span>
+                </button>
+                <button
+                  onClick={() => setChartMode('bar')}
+                  className={`px-3 py-1 rounded-lg font-medium transition flex items-center gap-1.5 ${
+                    chartMode === 'bar'
+                      ? 'bg-stone-800 text-amber-200 border border-stone-700/80 shadow-sm'
+                      : 'text-stone-400 hover:text-stone-200'
+                  }`}
+                >
+                  <Sliders className="w-3.5 h-3.5 text-amber-300" />
+                  <span>แนวนอน</span>
+                </button>
               </div>
             </div>
 
-            {/* Questions Progress Bars */}
-            <div className="space-y-4">
-              {SURVEY_QUESTIONS.map((q, idx) => {
-                const score = stats.questionAverages[idx] || 0;
-                const percentage = (score / 5) * 100;
-                const qInterp = getInterpretation(score);
+            {/* Content: Circular Gauges View (Default) */}
+            {chartMode === 'circle' ? (
+              <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-3.5">
+                {SURVEY_QUESTIONS.map((q, idx) => {
+                  const score = stats.questionAverages[idx] || 0;
+                  const percentage = Math.min(100, Math.max(0, (score / 5) * 100));
+                  const qInterp = getInterpretation(score);
+                  const radius = 38;
+                  const circumference = 2 * Math.PI * radius; // ~238.76
+                  const strokeDashoffset = circumference - (percentage / 100) * circumference;
 
-                return (
-                  <div key={q.key} className="space-y-1.5">
-                    <div className="flex flex-wrap items-center justify-between text-xs sm:text-sm gap-2">
-                      <div className="flex items-center gap-2">
-                        <span className="font-mono text-stone-500 text-xs">
+                  return (
+                    <motion.div
+                      key={q.key}
+                      initial={{ opacity: 0, scale: 0.95 }}
+                      animate={{ opacity: 1, scale: 1 }}
+                      transition={{ delay: idx * 0.05 }}
+                      className={`rounded-2xl p-4 border flex flex-col items-center justify-between text-center transition-all ${
+                        isLightMode
+                          ? 'bg-stone-50/80 border-stone-200'
+                          : 'bg-stone-950/60 border-stone-800/80 hover:border-stone-700'
+                      }`}
+                    >
+                      {/* Top Label */}
+                      <div className="w-full mb-1">
+                        <span className="text-[11px] font-mono font-bold text-amber-300">
                           0{q.id}.
                         </span>
-                        <span
-                          className={`font-medium ${
-                            isLightMode ? 'text-stone-800' : 'text-stone-200'
-                          }`}
-                        >
-                          {q.title}
-                        </span>
+                        <div className="text-xs font-semibold text-stone-200 truncate mt-0.5">
+                          {q.shortLabel}
+                        </div>
                       </div>
 
-                      <div className="flex items-center gap-3">
+                      {/* Circular Gauge Ring */}
+                      <div className="relative w-28 h-28 my-2 flex items-center justify-center shrink-0">
+                        <svg className="w-28 h-28 transform -rotate-90" viewBox="0 0 100 100">
+                          {/* Background Track */}
+                          <circle
+                            cx="50"
+                            cy="50"
+                            r={radius}
+                            className={`${isLightMode ? 'text-stone-200' : 'text-stone-800/80'} stroke-current`}
+                            strokeWidth="6.5"
+                            fill="transparent"
+                          />
+                          {/* Animated Foreground Arc */}
+                          <circle
+                            cx="50"
+                            cy="50"
+                            r={radius}
+                            stroke="url(#champagneGoldCirc)"
+                            strokeWidth="6.5"
+                            strokeLinecap="round"
+                            fill="transparent"
+                            style={{
+                              strokeDasharray: circumference,
+                              strokeDashoffset,
+                              transition: 'stroke-dashoffset 0.8s cubic-bezier(0.16, 1, 0.3, 1)',
+                            }}
+                          />
+                        </svg>
+
+                        {/* Center Score */}
+                        <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none">
+                          <span className="font-serif font-bold text-2xl text-amber-200 tracking-tight leading-none">
+                            {score.toFixed(2)}
+                          </span>
+                          <span className="text-[10px] font-mono text-stone-500 mt-0.5">
+                            / 5.00
+                          </span>
+                        </div>
+                      </div>
+
+                      {/* Bottom Interpretation */}
+                      <div className="w-full mt-1 pt-2 border-t border-stone-800/40 flex flex-col items-center gap-1">
                         <span
-                          className={`text-[11px] px-2 py-0.5 rounded-full border ${qInterp.badgeColor}`}
+                          className={`text-[10px] px-2 py-0.5 rounded-full border ${qInterp.badgeColor} leading-tight truncate max-w-full`}
                         >
                           {qInterp.level}
                         </span>
-                        <span className="font-serif font-bold text-base text-amber-200 w-12 text-right">
-                          {score.toFixed(2)}
+                        <span className="text-[11px] text-stone-400 line-clamp-2 mt-0.5 leading-snug">
+                          {q.title.replace(/^\d+\.\s*/, '')}
                         </span>
                       </div>
-                    </div>
+                    </motion.div>
+                  );
+                })}
+              </div>
+            ) : (
+              /* Content: Horizontal Bars View */
+              <div className="space-y-4">
+                {SURVEY_QUESTIONS.map((q, idx) => {
+                  const score = stats.questionAverages[idx] || 0;
+                  const percentage = (score / 5) * 100;
+                  const qInterp = getInterpretation(score);
 
-                    {/* Progress Bar */}
-                    <div
-                      className={`h-2.5 rounded-full overflow-hidden border ${
-                        isLightMode
-                          ? 'bg-stone-100 border-stone-200'
-                          : 'bg-stone-950 border-stone-800'
-                      }`}
-                    >
-                      <motion.div
-                        initial={{ width: 0 }}
-                        animate={{ width: `${percentage}%` }}
-                        transition={{ duration: 0.6, delay: idx * 0.05 }}
-                        className="h-full rounded-full bg-gradient-to-r from-stone-500 to-amber-300"
-                      />
-                    </div>
-                  </div>
-                );
-              })}
-            </div>
+                  return (
+                    <div key={q.key} className="space-y-1.5">
+                      <div className="flex flex-wrap items-center justify-between text-xs sm:text-sm gap-2">
+                        <div className="flex items-center gap-2">
+                          <span className="font-mono text-stone-500 text-xs">
+                            0{q.id}.
+                          </span>
+                          <span
+                            className={`font-medium ${
+                              isLightMode ? 'text-stone-800' : 'text-stone-200'
+                            }`}
+                          >
+                            {q.title}
+                          </span>
+                        </div>
 
-            {/* Scale Legend (Zero-Pill, Unboxed Metadata) */}
+                        <div className="flex items-center gap-3">
+                          <span
+                            className={`text-[11px] px-2 py-0.5 rounded-full border ${qInterp.badgeColor}`}
+                          >
+                            {qInterp.level}
+                          </span>
+                          <span className="font-serif font-bold text-base text-amber-200 w-12 text-right">
+                            {score.toFixed(2)}
+                          </span>
+                        </div>
+                      </div>
+
+                      <div
+                        className={`h-2.5 rounded-full overflow-hidden border ${
+                          isLightMode
+                            ? 'bg-stone-100 border-stone-200'
+                            : 'bg-stone-950 border-stone-800'
+                        }`}
+                      >
+                        <motion.div
+                          initial={{ width: 0 }}
+                          animate={{ width: `${percentage}%` }}
+                          transition={{ duration: 0.6, delay: idx * 0.05 }}
+                          className="h-full rounded-full bg-gradient-to-r from-stone-500 to-amber-300"
+                        />
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+
+            {/* Scale Legend */}
             <div
               className={`mt-6 pt-4 border-t grid grid-cols-2 sm:grid-cols-5 gap-2 text-[11px] ${
                 isLightMode
