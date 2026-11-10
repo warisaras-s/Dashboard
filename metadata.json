@@ -1,0 +1,6 @@
+{
+  "name": "LiveFeedback - ระบบประเมินความพึงพอใจการอบรม & Real-time Dashboard",
+  "description": "เว็บแอปพลิเคชันสำหรับประเมินความพึงพอใจการอบรมแบบ Real-time รองรับการตอบผ่านมือถือ แสดงผล Dashboard ขึ้นจอโปรเจกเตอร์ พร้อม QR Code และดาวน์โหลดข้อมูลเป็น CSV",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
